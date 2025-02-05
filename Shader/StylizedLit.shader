@@ -4,14 +4,12 @@
 //WebSite : https://madumpa.com/
 //Twitter : @madumpa
 
-
-
 Shader "Universal Render Pipeline/Stylized Lit"
 {
     Properties
     {
         // Specular vs Metallic workflow
-        [HideInInspector] _WorkflowMode("WorkflowMode", Float) = 1.0
+        _WorkflowMode("WorkflowMode", Float) = 1.0
 
         [MainTexture] _BaseMap("Albedo", 2D) = "white" {}
         [MainColor] _BaseColor("Color", Color) = (1,1,1,1)
@@ -22,11 +20,9 @@ Shader "Universal Render Pipeline/Stylized Lit"
         //[Header(StylizedDiffuse)]
         [Space(10)]
         _BrushTex("Brush Texture(R : Med Tone, G:Shadow, B:Reflect)", 2D) = "white"{}
-
         _MedBrushStrength ("Med Tone Brush Strength", Range(0,1)) = 0
         _ShadowBrushStrength ("Shadow Brush Strength", Range(0,1)) = 0
         _ReflBrushStrength ("Reflect Brush Strength", Range(0,1)) = 0
-
         [Space(10)]
         _MedColor("Med Tone Color", Color) = (1,1,1,1)
         _MedThreshold ("Med Tone Threshold", Range(0,1)) = 1
@@ -41,7 +37,6 @@ Shader "Universal Render Pipeline/Stylized Lit"
         _ReflectColor ("Reflect Color", Color) = (0,0,0,0)
         _ReflectThreshold ("Reflect Threshold", Range(0,1)) = 0
         _ReflectSmooth ("Reflect Smooth", Range(0,0.5)) = 0.25
-
         _GIIntensity("GI Intensity", Range(0,2)) = 1
         
         //[Header(StylizedReflection)]
@@ -56,13 +51,11 @@ Shader "Universal Render Pipeline/Stylized Lit"
         _FresnelThreshold("Fresnel Threshold", Range(0,1)) = 0.5
         _FresnelSmooth("Fresnel Smooth", Range(0,0.5) ) = 0.5
         _FresnelIntensity("Fresnel Intensity", float) = 1
-
         _ReflProbeIntensity("Non Metal Reflection Probe Intensity", float) = 1
         _MetalReflProbeIntensity ("Metal Reflection Probe Intensity", float) = 1
         
         [Space(30)]
         _Smoothness("Smoothness", Range(0.0, 1.0)) = 0.5
-        _GlossMapScale("Smoothness Scale", Range(0.0, 1.0)) = 1.0
         _SmoothnessTextureChannel("Smoothness texture channel", Float) = 0
 
         _Metallic("Metallic", Range(0.0, 1.0)) = 0.0
@@ -84,17 +77,21 @@ Shader "Universal Render Pipeline/Stylized Lit"
         _EmissionMap("Emission", 2D) = "white" {}
 
         // Blending state
-        [HideInInspector] _Surface("__surface", Float) = 0.0
-        [HideInInspector] _Blend("__blend", Float) = 0.0
-        [HideInInspector] _AlphaClip("__clip", Float) = 0.0
+        _Surface("__surface", Float) = 0.0
+        _Blend("__blend", Float) = 0.0
+        _Cull("__cull", Float) = 2.0
+        [ToggleUI] _AlphaClip("__clip", Float) = 0.0
         [HideInInspector] _SrcBlend("__src", Float) = 1.0
         [HideInInspector] _DstBlend("__dst", Float) = 0.0
+        [HideInInspector] _SrcBlendAlpha("__srcA", Float) = 1.0
+        [HideInInspector] _DstBlendAlpha("__dstA", Float) = 0.0
         [HideInInspector] _ZWrite("__zw", Float) = 1.0
-        [HideInInspector] _Cull("__cull", Float) = 2.0
+        [HideInInspector] _BlendModePreserveSpecular("_BlendModePreserveSpecular", Float) = 1.0
+        [HideInInspector] _AlphaToMask("__alphaToMask", Float) = 0.0
 
-        _ReceiveShadows("Receive Shadows", Range(0,1)) = 1.0     //얘도 살려둠 
+        [ToggleUI] _ReceiveShadows("Receive Shadows", Range(0,1)) = 1.0
         // Editmode props
-        [HideInInspector] _QueueOffset("Queue offset", Float) = 0.0
+        _QueueOffset("Queue offset", Float) = 0.0
 
         // ObsoleteProperties
         [HideInInspector] _MainTex("BaseMap", 2D) = "white" {}
@@ -109,7 +106,12 @@ Shader "Universal Render Pipeline/Stylized Lit"
         // Universal Pipeline tag is required. If Universal render pipeline is not set in the graphics settings
         // this Subshader will fail. One can add a subshader below or fallback to Standard built-in to make this
         // material work with both Universal Render Pipeline and Builtin Unity Pipeline
-        Tags{"RenderType" = "Opaque" "RenderPipeline" = "UniversalPipeline" "IgnoreProjector" = "True"}
+        Tags
+        {
+            "RenderType" = "Opaque"
+            "RenderPipeline" = "UniversalPipeline"
+            "IgnoreProjector" = "True"
+        }
         LOD 300
 
         // ------------------------------------------------------------------
@@ -119,11 +121,17 @@ Shader "Universal Render Pipeline/Stylized Lit"
             // Lightmode matches the ShaderPassName set in UniversalRenderPipeline.cs. SRPDefaultUnlit and passes with
             // no LightMode tag are also rendered by Universal Render Pipeline
             Name "ForwardLit"
-            Tags{"LightMode" = "UniversalForward"}
+            Tags
+            {
+                "LightMode" = "UniversalForward"
+            }
 
-            Blend[_SrcBlend][_DstBlend]
+            // -------------------------------------
+            // Render State Commands
+            Blend[_SrcBlend][_DstBlend], [_SrcBlendAlpha][_DstBlendAlpha]
             ZWrite[_ZWrite]
             Cull[_Cull]
+            AlphaToMask[_AlphaToMask]
 
             HLSLPROGRAM
             // Required to compile gles 2.0 with standard SRP library
@@ -132,48 +140,64 @@ Shader "Universal Render Pipeline/Stylized Lit"
             #pragma exclude_renderers d3d11_9x
             #pragma target 2.0
 
+
+            // -------------------------------------
+            // Shader Stages
+            #pragma vertex LitPassVertex
+            #pragma fragment LitPassFragment
+
             // -------------------------------------
             // Material Keywords
             #pragma shader_feature _NORMALMAP
+            #pragma shader_feature _RECEIVE_SHADOWS_OFF
+            #pragma shader_feature _SURFACE_TYPE_TRANSPARENT
             #pragma shader_feature _ALPHATEST_ON
-            #pragma shader_feature _ALPHAPREMULTIPLY_ON
+            #pragma shader_feature _ _ALPHAPREMULTIPLY_ON _ALPHAMODULATE_ON
             #pragma shader_feature _EMISSION
             #pragma shader_feature _METALLICSPECGLOSSMAP
             #pragma shader_feature _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
             #pragma shader_feature _OCCLUSIONMAP
-
             #pragma shader_feature _SPECULARHIGHLIGHTS_OFF
             #pragma shader_feature _ENVIRONMENTREFLECTIONS_OFF
             #pragma shader_feature _SPECULAR_SETUP
-            #pragma shader_feature _RECEIVE_SHADOWS_OFF
 
             // -------------------------------------
             // Universal Pipeline keywords
-            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS
-            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS_CASCADE
+            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
             #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
+            #pragma multi_compile _ EVALUATE_SH_MIXED EVALUATE_SH_VERTEX
             #pragma multi_compile _ _ADDITIONAL_LIGHT_SHADOWS
-            #pragma multi_compile _ _SHADOWS_SOFT
+            #pragma multi_compile _ _REFLECTION_PROBE_BLENDING
+            #pragma multi_compile _ _REFLECTION_PROBE_BOX_PROJECTION
+            #pragma multi_compile _ _SHADOWS_SOFT _SHADOWS_SOFT_LOW _SHADOWS_SOFT_MEDIUM _SHADOWS_SOFT_HIGH
+            #pragma multi_compile _ _SCREEN_SPACE_OCCLUSION
+            #pragma multi_compile _ _DBUFFER_MRT1 _DBUFFER_MRT2 _DBUFFER_MRT3
+            #pragma multi_compile _ _LIGHT_COOKIES
+            #pragma multi_compile _ _LIGHT_LAYERS
+            #pragma multi_compile _ _FORWARD_PLUS
             #pragma multi_compile _ _MIXED_LIGHTING_SUBTRACTIVE
+            #include_with_pragmas "Packages/com.unity.render-pipelines.core/ShaderLibrary/FoveatedRenderingKeywords.hlsl"
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/RenderingLayers.hlsl"
+
 
             // -------------------------------------
             // Unity defined keywords
-            #pragma multi_compile _ DIRLIGHTMAP_COMBINED
-            #pragma multi_compile _ LIGHTMAP_ON
             #pragma multi_compile _ LIGHTMAP_SHADOW_MIXING
             #pragma multi_compile _ SHADOWS_SHADOWMASK
+            #pragma multi_compile _ DIRLIGHTMAP_COMBINED
+            #pragma multi_compile _ LIGHTMAP_ON
+            #pragma multi_compile _ DYNAMICLIGHTMAP_ON
+            #pragma multi_compile_fragment _ LOD_FADE_CROSSFADE
             #pragma multi_compile_fog
+            #pragma multi_compile_fragment _ DEBUG_DISPLAY
 
             //--------------------------------------
             // GPU Instancing
             #pragma multi_compile_instancing
-
-            #pragma vertex LitPassVertex
-            #pragma fragment LitPassFragment
+            #pragma instancing_options renderinglayer
 
             #include "StylizedLitInput.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
-
 
             //#include "LitInput.hlsl"
             //#include "LitForwardPass.hlsl"
@@ -475,8 +499,13 @@ Shader "Universal Render Pipeline/Stylized Lit"
         Pass
         {
             Name "ShadowCaster"
-            Tags{"LightMode" = "ShadowCaster"}
+            Tags
+            {
+                "LightMode" = "ShadowCaster"
+            }
 
+            // -------------------------------------
+            // Render State Commands
             ZWrite On
             ZTest LEqual
             Cull[_Cull]
@@ -488,17 +517,31 @@ Shader "Universal Render Pipeline/Stylized Lit"
             #pragma target 2.0
 
             // -------------------------------------
+            // Shader Stages
+            #pragma vertex ShadowPassVertex
+            #pragma fragment ShadowPassFragment
+
+            // -------------------------------------
             // Material Keywords
             #pragma shader_feature _ALPHATEST_ON
+            #pragma shader_feature _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
 
             //--------------------------------------
             // GPU Instancing
             #pragma multi_compile_instancing
-            #pragma shader_feature _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
 
-            #pragma vertex ShadowPassVertex
-            #pragma fragment ShadowPassFragment
+            // -------------------------------------
+            // Universal Pipeline keywords
 
+            // -------------------------------------
+            // Unity defined keywords
+            #pragma multi_compile_fragment _ LOD_FADE_CROSSFADE
+
+            // This is used during shadow map generation to differentiate between directional and punctual light shadows, as they use different formulas to apply Normal Bias
+            #pragma multi_compile_vertex _ _CASTING_PUNCTUAL_LIGHT_SHADOW
+
+            // -------------------------------------
+            // Includes
             #include "StylizedLitInput.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/Shaders/ShadowCasterPass.hlsl"
             ENDHLSL
@@ -507,10 +550,15 @@ Shader "Universal Render Pipeline/Stylized Lit"
         Pass
         {
             Name "DepthOnly"
-            Tags{"LightMode" = "DepthOnly"}
+            Tags
+            {
+                "LightMode" = "DepthOnly"
+            }
 
+            // -------------------------------------
+            // Render State Commands
             ZWrite On
-            ColorMask 0
+            ColorMask R
             Cull[_Cull]
 
             HLSLPROGRAM
@@ -519,6 +567,8 @@ Shader "Universal Render Pipeline/Stylized Lit"
             #pragma exclude_renderers d3d11_9x
             #pragma target 2.0
 
+            // -------------------------------------
+            // Shader Stages
             #pragma vertex DepthOnlyVertex
             #pragma fragment DepthOnlyFragment
 
@@ -527,42 +577,69 @@ Shader "Universal Render Pipeline/Stylized Lit"
             #pragma shader_feature _ALPHATEST_ON
             #pragma shader_feature _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
 
+            // -------------------------------------
+            // Unity defined keywords
+            #pragma multi_compile _ LOD_FADE_CROSSFADE
+
             //--------------------------------------
             // GPU Instancing
             #pragma multi_compile_instancing
 
+            // -------------------------------------
+            // Includes
             #include "StylizedLitInput.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/Shaders/DepthOnlyPass.hlsl"
             ENDHLSL
         }
 
+        // This pass is used when drawing to a _CameraNormalsTexture texture
         Pass
         {
             Name "DepthNormals"
-            Tags{"LightMode" = "DepthNormals"}
+            Tags
+            {
+                "LightMode" = "DepthNormals"
+            }
 
+            // -------------------------------------
+            // Render State Commands
             ZWrite On
             Cull[_Cull]
 
             HLSLPROGRAM
-            #pragma only_renderers gles gles3 glcore d3d11
+            // Required to compile gles 2.0 with standard srp library
+            #pragma prefer_hlslcc gles
+            #pragma exclude_renderers d3d11_9x
             #pragma target 2.0
 
+            // -------------------------------------
+            // Shader Stages
             #pragma vertex DepthNormalsVertex
             #pragma fragment DepthNormalsFragment
 
             // -------------------------------------
             // Material Keywords
             #pragma shader_feature _NORMALMAP
+            #pragma shader_feature _PARALLAXMAP
             #pragma shader_feature _ALPHATEST_ON
             #pragma shader_feature _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
+
+            // -------------------------------------
+            // Unity defined keywords
+            #pragma multi_compile _ LOD_FADE_CROSSFADE
+
+            // -------------------------------------
+            // Universal Pipeline keywords
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/RenderingLayers.hlsl"
 
             //--------------------------------------
             // GPU Instancing
             #pragma multi_compile_instancing
 
+            // -------------------------------------
+            // Includes
             #include "StylizedLitInput.hlsl"
-            #include "Packages/com.unity.render-pipelines.universal/Shaders/DepthNormalsPass.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/Shaders/LitDepthNormalsPass.hlsl"
             ENDHLSL
         }
 
@@ -570,36 +647,54 @@ Shader "Universal Render Pipeline/Stylized Lit"
         Pass
         {
             Name "Meta"
-            Tags{"LightMode" = "Meta"}
+            Tags
+            {
+                "LightMode" = "Meta"
+            }
 
+            // -------------------------------------
+            // Render State Commands
             Cull Off
 
             HLSLPROGRAM
             // Required to compile gles 2.0 with standard srp library
             #pragma prefer_hlslcc gles
             #pragma exclude_renderers d3d11_9x
+            #pragma target 2.0
 
+            // -------------------------------------
+            // Shader Stages
             #pragma vertex UniversalVertexMeta
             #pragma fragment UniversalFragmentMetaLit
 
+            // -------------------------------------
+            // Material Keywords
             #pragma shader_feature _SPECULAR_SETUP
             #pragma shader_feature _EMISSION
             #pragma shader_feature _METALLICSPECGLOSSMAP
             #pragma shader_feature _ALPHATEST_ON
             #pragma shader_feature _ _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
-
             #pragma shader_feature _SPECGLOSSMAP
+            #pragma shader_feature EDITOR_VISUALIZATION
 
+            // -------------------------------------
+            // Includes
             #include "StylizedLitInput.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/Shaders/LitMetaPass.hlsl"
 
             ENDHLSL
         }
+
         Pass
         {
             Name "Universal2D"
-            Tags{ "LightMode" = "Universal2D" }
+            Tags
+            {
+                "LightMode" = "Universal2D"
+            }
 
+            // -------------------------------------
+            // Render State Commands
             Blend[_SrcBlend][_DstBlend]
             ZWrite[_ZWrite]
             Cull[_Cull]
@@ -608,19 +703,26 @@ Shader "Universal Render Pipeline/Stylized Lit"
             // Required to compile gles 2.0 with standard srp library
             #pragma prefer_hlslcc gles
             #pragma exclude_renderers d3d11_9x
+            #pragma target 2.0
 
+            // -------------------------------------
+            // Shader Stages
             #pragma vertex vert
             #pragma fragment frag
+
+            // -------------------------------------
+            // Material Keywords
             #pragma shader_feature _ALPHATEST_ON
             #pragma shader_feature _ALPHAPREMULTIPLY_ON
 
+            // -------------------------------------
+            // Includes
             #include "StylizedLitInput.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/Shaders/Utils/Universal2D.hlsl"
             ENDHLSL
         }
-
-
     }
+
     FallBack "Hidden/Universal Render Pipeline/FallbackError"
     CustomEditor "UnityEditor.Rendering.Universal.ShaderGUI.StylizedLitShader"
 }
