@@ -103,7 +103,7 @@ namespace UnityEditor.Rendering.Universal.ShaderGUI
         }
 
         // material changed check
-        public override void MaterialChanged(Material material)
+        public override void ValidateMaterial(Material material)
         {
             if (material == null)
                 throw new ArgumentNullException("material");
@@ -129,7 +129,7 @@ namespace UnityEditor.Rendering.Universal.ShaderGUI
             if (EditorGUI.EndChangeCheck())
             {
                 foreach (var obj in blendModeProp.targets)
-                    MaterialChanged((Material)obj);
+                    ValidateMaterial((Material)obj);
             }
             base.DrawSurfaceOptions(material);
         }
@@ -232,7 +232,7 @@ namespace UnityEditor.Rendering.Universal.ShaderGUI
                 materialEditor.ShaderProperty(litProperties.reflections, StylizedLitGUI.Styles.reflectionsText);
                 if(EditorGUI.EndChangeCheck())
                 {
-                    MaterialChanged(material);
+                    ValidateMaterial(material);
                 }
             }
             
@@ -291,7 +291,7 @@ namespace UnityEditor.Rendering.Universal.ShaderGUI
                     material.SetTexture("_MetallicSpecGlossMap", texture);
             }
 
-            MaterialChanged(material);
+            ValidateMaterial(material);
         }
     }
 }
